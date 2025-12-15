@@ -1,0 +1,89 @@
+#!/bin/zsh
+# Open ready PRs for review
+
+if [[ -z "$GIT_FOLDER" ]]; then
+    echo "GIT_FOLDER is not set. Skipping execution."
+    exit 0
+fi
+
+if [[ -z "$READY_PRS_SOURCE_FILE" ]]; then
+    echo "READY_PRS_SOURCE_FILE is not set. Skipping execution."
+    exit 0
+fi
+
+if [[ -z "$READY_PRS_REVIEWERS" ]]; then
+    echo "READY_PRS_REVIEWERS is not set. Skipping execution."
+    exit 0
+fi
+
+# --- Safety date check (reviewer rotation) ---
+invalid_after="2026-01-05"  # YYYY-MM-DD
+
+today=$(date +%Y-%m-%d)
+
+if [[ "$today" > "$invalid_after" ]]; then
+    echo "Your reviewers have changed! Update them in $READY_PRS_REVIEWERS"
+    exit 1
+fi
+
+cd $GIT_FOLDER/platform
+
+reviewers=(${(z)READY_PRS_REVIEWERS}) # Split on words
+
+while IFS=, read -r pr bypass_sonar; do
+    echo "Processing PR #$pr (bypass_sonar: $bypass_sonar)... (https://github.com/360Learning/platform/pull/$pr)"
+
+    pr_state=$(gh pr view "$pr" --json state --jq '.state')
+    # --- Check if PR is open ---
+    if [[ "$pr_state" != "OPEN" ]]; then
+        echo "PR #$pr is not open. Skipping."
+        continue
+    fi
+
+    is_draft=$(gh pr view "$pr" --json state,isDraft --jq '.isDraft')
+    # --- Check if PR is draft ---
+    if [[ "$is_draft" != "true" ]]; then
+        echo "PR #$pr is not a draft. Skipping."
+        continue
+    fi
+
+    copilot_reviewed=$(gh pr view "$pr" --json reviews --jq '.reviews[] | select(.author.login=="copilot-pull-request-reviewer") | .author.login')
+    copilot_reviewed=$(echo "$copilot_reviewed" | head -n1)
+    if [[ -z "$copilot_reviewed" ]]; then
+        echo "PR #$pr has not been reviewed by Copilot yet. Skipping."
+        continue
+    fi
+
+    # --- Get check statuses ---
+    checks=$(gh pr checks "$pr" --json state,name)
+
+    pending_count=$(echo "$checks" | jq '[.[] | select(.state=="IN_PROGRESS" or .state=="QUEUED")] | length')
+    #
+    # Count failing, ignoring SonarCloud if bypass_sonar=true
+    if [[ "$bypass_sonar" == "true" ]]; then
+        failing_count=$(echo "$checks" | jq '[.[] | select((.state=="FAILURE" or .state=="CANCELLED" or .state=="TIMED_OUT") and .name != "SonarCloud Code Analysis")] | length')
+    else
+        failing_count=$(echo "$checks" | jq '[.[] | select(.state=="FAILURE" or .state=="CANCELLED" or .state=="TIMED_OUT")] | length')
+    fi
+    if (( pending_count > 0 || failing_count > 0 )); then
+    echo "PR #$pr has pending ($pending_count) or failing ($failing_count) checks. Skipping."
+    continue
+    fi
+
+    # --- Check if mergeable (no conflicts) ---
+    mergeable=$(gh pr view "$pr" --json mergeable --jq '.mergeable')
+    if [[ "$mergeable" != "MERGEABLE" ]]; then
+        echo "PR #$pr has merge conflicts. Skipping."
+        continue
+    fi
+
+    # --- Take PR out of draft ---
+    echo "Marking PR #$pr as ready for review..."
+    gh pr ready "$pr"
+
+    # --- Request review ---
+    for reviewer in "${reviewers[@]}"; do
+        echo "Requesting review from $reviewer for PR #$pr..."
+        gh pr edit "$pr" --add-reviewer "$reviewer"
+    done
+done < $READY_PRS_SOURCE_FILE
