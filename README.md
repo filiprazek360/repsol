@@ -26,3 +26,24 @@ I recommend aliasing the command you use for force pushing to this script (for e
 If you want to bypass the script (for any reason), you can still run `git push --force` or `git push --force-with-lease`.
 
 Note that it adds a minor overhead if your connection is very slow.
+
+### pull-request-analyze
+
+This script analyzes a pull request for code issues. Can also run on the current diff if no argument is supplied.
+
+Currently supports:
+- Vue property ordering
+- client-side eslint
+
+#### Usage
+
+```
+pull-request-analyze <PR-NUMBER> # Checks out the branch and runs the checks
+pull-request-analyze <PR-NUMBER> # Runs the checks on the local diff
+```
+
+I added this alias to my shell for simplicity:
+```
+alias pra=/home/filip/repsol/pull-request-analyze
+```
+

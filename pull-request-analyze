@@ -1,0 +1,74 @@
+#!/bin/zsh
+
+# Analyze an existing pull request
+
+git_parent_dir=$(git rev-parse --show-toplevel)
+
+if [[ $# -eq 0 ]]; then
+    # Analyze the current diff
+    files=$((
+        git diff HEAD --name-only --diff-filter=ACM
+        git ls-files --others --exclude-standard
+    ) | sort -u)
+    if [[ -z "$files" ]]; then
+        echo "No files to analyze"
+        exit 0
+    fi
+else
+    pr_number=$1
+
+    pr_json=$(gh pr view "$pr_number" --json baseRefName,headRefName | jq -r '.')
+    base_branch=$(echo "$pr_json" | jq -r '.baseRefName')
+    head_branch=$(echo "$pr_json" | jq -r '.headRefName')
+
+    files=$(gh pr view "$pr_number" --json files -q '.files[].path' | xargs -I{} git ls-tree --name-only "$head_branch" {} 2>/dev/null)
+
+    git checkout "$head_branch"
+fi
+
+files=("${(@f)files}")
+echo "Running analysis on ${#files} files"
+
+forbidden_patterns=(
+    ".*\.vue$" "defineEmits(\n|.)*defineProps" "defineProps must appear before defineEmits"
+    ".*\.vue$" "onBeforeMount\((\n|.)*function" "functions must appear before onBeforeMount"
+    ".*\.vue$" "computed(<|\()(\n|.)*ref(<|\()" "ref must appear before computed"
+    ".*\.vue$" "ref(<|\()(\n|.)*defineEmits" "defineEmits must appear before ref"
+)
+
+error_found=false
+for ((i=3; i<=${#forbidden_patterns[@]}; i+=3)); do
+    file_pattern="${forbidden_patterns[i-2]}"
+    pattern="${forbidden_patterns[i-1]}"
+    message="${forbidden_patterns[i]}"
+    for file in $files; do
+        full_file_path="$git_parent_dir/$file"
+        if [[ ! "$file" =~ "$file_pattern" ]]; then
+            continue
+        fi
+        if rg --multiline "$pattern" "$full_file_path"; then
+            echo "Forbidden pattern found in $file: $message"
+            error_found=true
+        fi
+    done 
+done
+
+cd $git_parent_dir/packages/client
+files_without_prefix=()
+for file in $files; do
+    if [[ "$file" == packages/client/* ]]; then
+        files_without_prefix+=("${file#packages/client/}")
+    fi
+done
+
+if (( ${#files_without_prefix[@]} )); then
+    $git_parent_dir/node_modules/.bin/eslint $files_without_prefix --report-unused-disable-directives || error_found=true
+fi
+
+if $error_found; then
+    echo "Error found in the diff"
+    exit 1
+fi
+echo "No errors found in the diff"
+exit 0
+
