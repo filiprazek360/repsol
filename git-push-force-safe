@@ -1,0 +1,48 @@
+#!/usr/bin/env zsh
+# Push a branch safely, blocking if there are any open PRs that are not drafts
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || {
+	echo "❌ Not a git repository"
+		return 1
+}
+
+remote_url=$(git remote get-url origin)
+	if [[ "$remote_url" =~ github.com[:/](.+)/([^/]+)$ ]]; then
+	owner="${match[1]}"
+	repo="${match[2]}"
+	repo="${repo%.git}"
+	fi
+
+# Get token (from gh CLI)
+token=$(gh auth token 2>/dev/null)
+	if [[ -z "$token" ]]; then
+	echo "❌ No GitHub token found. Run \`gh auth login\` first."
+	return 1
+	fi
+
+# Query PRs for this branch
+	pr_info=$(curl -s -H "Authorization: token $token" \
+			"https://api.github.com/repos/$owner/$repo/pulls?head=$owner:$branch&state=open")
+
+
+# Filter PRs for this branch
+	pr_list=$(printf "%s" "$pr_info" | jq -c --arg branch "$branch" '
+			map(select(.head.ref == $branch))
+			')
+
+# Count the number of PRs
+	pr_count=$(printf "%s" "$pr_list" | jq 'length')
+	echo "🔹 Found $pr_count PR(s) for branch '$branch'"
+
+# Get draft statuses
+	draft_statuses=$(printf "%s" "$pr_list" | jq -r 'map(.draft)[]')
+
+# Block if any PR is non-draft
+	if printf "%s\n" "$draft_statuses" | grep -q '^false$'; then
+	echo "❌ Branch '$branch' has at least one open PR that is NOT draft. Force push rejected."
+	return 1
+	fi
+
+	echo "✅ Safe to force push branch '$branch'"
+	git push --force-with-lease origin "$branch"
+

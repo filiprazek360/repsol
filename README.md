@@ -16,3 +16,13 @@ Needs `GIT_FOLDER`, `READY_PRS_SOURCE_FILE` and `READY_PRS_REVIEWERS` environmen
 PR_NUMBER,SHOULD_BYPASS_SONAR_BOOLEAN
 ```
 If SHOULD_BYPASS_SONAR_BOOLEAN is "true", the script will open the PR even if the Sonar check fails (useful when you know you will not test client files such as `routes.ts`).
+
+### git-push-force-safe
+
+This script will check if a non-draft PR exists for this branch and block force pushing if it's the case.
+
+I recommend aliasing the command you use for force pushing to this script (for example, I ran `git config alias.pf '!/home/filip/repsol/git-push-force-safe'`).
+
+If you want to bypass the script (for any reason), you can still run `git push --force` or `git push --force-with-lease`.
+
+Note that it adds a minor overhead if your connection is very slow.
