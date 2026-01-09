@@ -17,7 +17,7 @@ if [[ -z "$READY_PRS_REVIEWERS" ]]; then
 fi
 
 # --- Safety date check (reviewer rotation) ---
-invalid_after="2026-01-05"  # YYYY-MM-DD
+invalid_after="2026-03-10"  # YYYY-MM-DD
 
 today=$(date +%Y-%m-%d)
 
