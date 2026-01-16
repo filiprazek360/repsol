@@ -65,6 +65,15 @@ if (( ${#files_without_prefix[@]} )); then
     $git_parent_dir/node_modules/.bin/eslint $files_without_prefix --report-unused-disable-directives || error_found=true
 fi
 
+cd $GIT_FOLDER/platform
+yarn synchronizeTypes
+
+if [[ -n $(git diff --name-only) ]]; then
+    echo "Run yarn synchronizeTypes before opening PR!"
+    git --no-pager diff --name-only
+    error_found=true
+fi
+
 if $error_found; then
     echo "Error found in the diff"
     exit 1
