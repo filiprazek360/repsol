@@ -29,7 +29,7 @@ Note that it adds a minor overhead if your connection is very slow.
 
 ### pull-request-analyze
 
-This script analyzes a pull request for code issues. Can also run on the current diff if no argument is supplied.
+This script analyzes a pull request for code issues. Can also run on the current diff if no argument is supplied. Also needs the `GIT_FOLDER` environment variable.
 
 Currently supports:
 - Vue property ordering
