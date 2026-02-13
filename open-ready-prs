@@ -66,8 +66,8 @@ while IFS=, read -r pr bypass_sonar; do
         failing_count=$(echo "$checks" | jq '[.[] | select(.state=="FAILURE" or .state=="CANCELLED" or .state=="TIMED_OUT")] | length')
     fi
     if (( pending_count > 0 || failing_count > 0 )); then
-    echo "PR #$pr has pending ($pending_count) or failing ($failing_count) checks. Skipping."
-    continue
+        echo "PR #$pr has pending ($pending_count) or failing ($failing_count) checks. Skipping."
+        continue
     fi
 
     # --- Check if mergeable (no conflicts) ---
