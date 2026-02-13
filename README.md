@@ -9,7 +9,7 @@ Most scripts were built to work with zsh, but should work with bash (or other sh
 ### open-ready-prs
 
 This script waits for your checks to complete before opening your PRs for review. Best used as an hourly cron (`cd <THIS_FOLDER> && . .env && ./open-ready-prs`)
-Needs `GIT_FOLDER`, `READY_PRS_SOURCE_FILE` and `READY_PRS_REVIEWERS` environment variables (example in `.env.example`)
+Needs `GIT_FOLDER`, `REPSOL_FOLDER`, `READY_PRS_SOURCE_FILE` and `READY_PRS_REVIEWERS` environment variables (example in `.env.example`)
 
 `READY_PRS_SOURCE_FILE` should contain ready PRs, one line per PR in the following format:
 ```

@@ -16,6 +16,11 @@ if [[ -z "$READY_PRS_REVIEWERS" ]]; then
     exit 0
 fi
 
+if [[ -z "$REPSOL_FOLDER" ]]; then
+    echo "REPSOL_FOLDER is not set. Skipping execution."
+    exit 0
+fi
+
 # --- Safety date check (reviewer rotation) ---
 invalid_after="2026-03-10"  # YYYY-MM-DD
 
@@ -74,6 +79,13 @@ while IFS=, read -r pr bypass_sonar; do
     mergeable=$(gh pr view "$pr" --json mergeable --jq '.mergeable')
     if [[ "$mergeable" != "MERGEABLE" ]]; then
         echo "PR #$pr has merge conflicts. Skipping."
+        continue
+    fi
+
+    $REPSOL_FOLDER/pull-request-analyze $pr
+
+    if [[ $? -ne 0 ]]; then
+        echo "Pull request analysis failed on PR #$pr. Skipping."
         continue
     fi
 
